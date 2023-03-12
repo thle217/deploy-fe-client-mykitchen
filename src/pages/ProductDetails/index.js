@@ -1,22 +1,103 @@
 import React from "react";
-import { useEffect } from "react";
-import { useLocation } from "react-router-dom";
+import Swal from "sweetalert2";
+import { useState, useEffect } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { useSelector } from "react-redux";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faMinus, faPlus } from "@fortawesome/free-solid-svg-icons";
+import { successDialog } from "../../components/Dialog";
+import { VND } from "../../utils/currency";
 import RelatedProducts from "../../components/RelatedProducts";
+import cartAPI from "../../services/cartAPI";
 
 function ProductDetails() {
 
 
+    const user = useSelector(state => state.user);
+    const navigate = useNavigate();
+
+
     //LẤY THÔNG TIN SẢN PHẨM VỪA CHỌN
     let { state } = useLocation();
-    console.log(state);
 
 
     //SCROLL MÀN HÌNH LÊN ĐẦU TRANG
     useEffect(() => {
         window.scrollTo(0, 0);
     }, [])
+
+
+    //XỬ LÝ TĂNG SỐ LƯỢNG
+    const [quantity, setQuantity] = useState(1);
+    const [isHidden, setIsHidden] = useState(true);
+
+    const handleIncrease = () => {
+        if(quantity < 10) {
+            setQuantity(quantity + 1);
+        }
+        else {
+            setIsHidden(false);
+        }
+    };
+
+
+    //XỬ LÝ GIẢM SỐ LƯỢNG
+    const handleDecrease = () => {
+        if(quantity > 1) {
+            setQuantity(quantity - 1);
+            if(isHidden === false) {
+                setIsHidden(true);
+            }
+        }
+    };
+
+
+    //DIALOG THÔNG BÁO ĐĂNG NHẬP
+    const loginDialog = () => {
+        Swal.fire({
+            title: "Bạn cần đăng nhập",
+            confirmButtonText: "Đăng nhập",
+            showCancelButton: true,
+            cancelButtonText: "Hủy",
+            customClass: {
+                title: "fs-5 text-dark",
+                confirmButton: "bg-primary shadow-none",
+                cancelButton: "bg-secondary shadow-none text-dark",
+            },
+        })
+        .then( async (result) => {
+            if (result.isConfirmed) {
+                navigate("/login");
+            }
+        });
+    };
+
+
+    //XỬ LÝ THÊM VÀO GIỎ HÀNG
+    const handleAddToCart = async (e) => {
+        e.preventDefault();
+        if(user.user_id) {
+            let obj = {
+                ...state,
+                user_id: user.user_id,
+                quantity: quantity,
+                price: state.price
+            }
+    
+            await cartAPI.add(obj)
+            .then(res => {
+                if(res.status === 200 || res.status === 201) {
+                    successDialog();
+                }
+                else if(res.status === 202) {
+                    setIsHidden(false);
+                }
+            });
+        }
+        else {
+            loginDialog();
+        }
+    };
 
 
     return (
@@ -41,7 +122,7 @@ function ProductDetails() {
 
                     <div className="col-lg-7 pb-5">
                         <h4 className="font-weight-semi-bold mb-5">{state.product_name}</h4>
-                        <h4 className="font-weight-semi-bold mb-4 text-danger">{state.price}<sup>đ</sup></h4>
+                        <h4 className="font-weight-semi-bold mb-4 text-danger">{VND.format(state.price)}</h4>
                         <div className="border bg-primary border-primary p-4 rounded-top">
                             <h5 className="text-white"><b>ƯU ĐÃI CHỈ CÓ Ở MY KITCHEN</b></h5>
                         </div>
@@ -50,23 +131,48 @@ function ProductDetails() {
                             <h5><i className="fas fa-check text-primary mb-3 mr-1"></i> Đổi trả trong 14 ngày</h5>
                             <h5><i className="fas fa-check text-primary mb-3 mr-1"></i> Tặng voucher -10% cho đơn hàng sau</h5>
                         </div>
-                        <form action="" method="post">
+                        <form action="" method="post" onSubmit={handleAddToCart}>
                             <div className="d-flex align-items-center mb-4 pt-2">
                                 <div className="input-group quantity mr-3" style={{width: '160px'}}>
                                     <div className="input-group-btn">
-                                        <button type="button" className="btn btn-primary btn-minus" style={{height: '50px', width: '50px'}}>
+                                        <button
+                                            type="button"
+                                            className="btn btn-primary btn-minus"
+                                            style={{height: '50px', width: '50px'}}
+                                            onClick={handleDecrease}
+                                        >
                                             <FontAwesomeIcon icon={faMinus} className="text-white"/>
                                         </button>
                                     </div>
-                                    <input type="text" readOnly className="form-control border-0 bg-white text-center mr-1 ml-1 pt-3" value="1" name="txt-quantity"/>
+                                    <input
+                                        type="text"
+                                        readOnly
+                                        className="form-control border-0 bg-white text-center mr-1 ml-1 pt-3"
+                                        value={quantity}
+                                        name="txt-quantity"
+                                    />
                                     <div className="input-group-btn">
-                                        <button type="button" className="btn btn-primary btn-plus" style={{height: '50px', width: '50px'}}>
+                                        <button
+                                            type="button"
+                                            className="btn btn-primary btn-plus"
+                                            style={{height: '50px', width: '50px'}}
+                                            onClick={handleIncrease}
+                                        >
                                             <FontAwesomeIcon icon={faPlus} className="text-white"/>
                                         </button>
                                     </div>
                                 </div>
-                                <button type="submit" name="action" value="add" className="btn btn-primary px-3 text-white" style={{height: '50px', width: '200px'}}><i className="fa fa-shopping-cart mr-1 text-white"></i> THÊM VÀO GIỎ</button>
+                                <button
+                                    type="submit"
+                                    name="action"
+                                    value="add"
+                                    className="btn btn-primary px-3 text-white"
+                                    style={{height: '50px', width: '200px'}}
+                                >
+                                    <i className="fa fa-shopping-cart mr-1 text-white"></i> THÊM VÀO GIỎ
+                                </button>
                             </div>
+                            <h6 className="text-danger" hidden={isHidden}>Số lượng sản phẩm đã đạt tối đa</h6>
                         </form>
                     </div>
                 </div>
